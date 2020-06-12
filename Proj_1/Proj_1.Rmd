@@ -1,0 +1,98 @@
+---
+title: "DATA612 - Project 1"
+author: "Leland Randles"
+date: "6/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Project 1
+  
+This system recommends clothing items based on ratings provided on other clothing items. The below user-item matrix, shows ratings for clothing items from 10 different users. Out of 50 user / clothes item combinations, 36 have been rated and 14 have not been rated.  
+
+First the necessary packages were loaded:  
+  
+```{r ip}
+library(caTools, quietly = TRUE)
+library(dplyr, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(ModelMetrics, quietly = TRUE)
+library(sqldf, quietly = TRUE)
+```
+  
+<br>
+
+#### Load and Prepare Data  
+  
+Then the ratings data was loaded and prepared:  
+  
+```{r data_prep}
+clothes_ratings_raw <- read.csv("https://raw.githubusercontent.com/Randles-CUNY/DATA612/master/Proj_1/clothes_ratings.csv")
+clothes_ratings_raw[clothes_ratings_raw=="?"] <- NA
+clothes_ratings_raw <- data.frame(lapply(clothes_ratings_raw, as.character), stringsAsFactors=FALSE)
+clothes_ratings_raw
+```  
+  
+<br>
+  
+#### Split Data into Training and Test Datasets  
+  
+The `clothes_ratings_raw` dataset was then split into training and test datasets:  
+  
+```{r train_test}
+# Lengthen data
+clothes_ratings <- clothes_ratings_raw %>% gather(key = Item, value = Rating, -User)
+clothes_ratings$Rating <- as.numeric(clothes_ratings$Rating)
+set.seed(250)
+train_test <- sample.split(clothes_ratings$Rating, SplitRatio = 0.75)
+train <- clothes_ratings
+train$Rating[!train_test] <- NA
+test <- clothes_ratings
+test$Rating[train_test] <- NA
+```  
+  
+<br>
+  
+#### Compute Raw Average and RMSE for Both Datasets  
+  
+Having split the clothes ratings data into `train` and `test` datasets, the next steps were to compute the raw average for the `train` dataset and the RMSE for both the `train` and `test` data:  
+  
+```{r avg_rmse}
+# Lengthen data
+train_raw_avg <- mean(train$Rating, na.rm = TRUE)
+train_raw_avg
+train_raw_avg_vect_trn <- rep(train_raw_avg, times = length(which(!is.na(train$Rating))))
+train_raw_avg_vect_tst <- rep(train_raw_avg, times = length(which(!is.na(test$Rating))))
+train_rmse <- rmse(train$Rating[which(!is.na(train$Rating))], train_raw_avg_vect_trn)
+train_rmse
+test_rmse <- rmse(test$Rating[which(!is.na(test$Rating))], train_raw_avg_vect_tst)
+test_rmse
+```  
+  
+<br> 
+  
+#### Calculate Bias Values, Baseline Predictors and Associagted RMSEs  
+  
+Next, the training set was used to calculate bias values for each user and each clothing item, then baseline predictors were added for each user / clothing item combination. Finally, RMSE was calculated for the baseline predictors for both:  
+  
+```{r bias}
+user_bias <- sqldf("select User, (sum(Rating)/count(Rating)) - 6 as user_bias from train where Rating <> 'NA' group by User")
+clothes_item_bias <- sqldf("select Item, (sum(Rating)/count(Rating)) - 6 as clothes_item_bias from train where Rating <> 'NA' group by Item")
+train <- merge(train, user_bias, by = "User")
+train <- merge(train, clothes_item_bias, by = "Item")
+train$baseline_pred <- 6 + train$user_bias + train$clothes_item_bias
+train_baseline_pred_rmse <- rmse(train$baseline_pred[which(!is.na(train$Rating))], train_raw_avg_vect_trn)
+train_baseline_pred_rmse
+test <- merge(test, user_bias, by = "User")
+test <- merge(test, clothes_item_bias, by = "Item")
+test$baseline_pred <- 6 + test$user_bias + test$clothes_item_bias
+test_baseline_pred_rmse <- rmse(test$baseline_pred[which(!is.na(test$Rating))], train_raw_avg_vect_tst)
+test_baseline_pred_rmse
+```  
+  
+<br>  
+  
+As you can see, the RMSE for the baseline predictors for both the `train` and `test` datasets dropped considerably compared to the RMSE which was calculated from raw averages.  
