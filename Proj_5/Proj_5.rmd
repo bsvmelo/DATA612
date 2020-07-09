@@ -98,6 +98,7 @@ svd_pred <- predict(svd_rec, getData(eval_sets, "known"), type = "ratings")
 ```  
   
 <br>
+
 ## Compare the UBCF and SVD Recommender Models to Spark Model
 <a href="#top"> Back To Top </a>  
   
