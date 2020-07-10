@@ -1,5 +1,5 @@
 ---
-title: "Final Project Proposal"
+title: "DATA 612 - Final Project Proposal"
 author: "Bruno de Melo and Leland Randles"
 date: "7/9/2020"
 output: 
